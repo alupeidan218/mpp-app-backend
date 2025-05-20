@@ -9,6 +9,9 @@ env:
   AZURE_WEBAPP_NAME: cpu-benchmark-app-hqgqhhf8dvf7hvft
   AZURE_WEBAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '18.x'
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  BACKEND_ENVIRONMENT: production
 
 jobs:
   build-and-deploy:
@@ -27,11 +30,15 @@ jobs:
       run: npm ci
 
     - name: Run database migrations
-      run: npx sequelize-cli db:migrate
+      run: |
+        echo "Running database migrations..."
+        echo "DATABASE_URL is set: ${{ env.DATABASE_URL != '' }}"
+        echo "BACKEND_ENVIRONMENT is set to: ${{ env.BACKEND_ENVIRONMENT }}"
+        npx sequelize-cli db:migrate
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        NODE_ENV: production
+        BACKEND_ENVIRONMENT: production
 
     - name: Azure Login
       uses: azure/login@v1
