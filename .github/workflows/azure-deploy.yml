@@ -42,8 +42,8 @@ jobs:
         echo "Running database migrations..."
         echo "DATABASE_URL is set: ${{ secrets.DATABASE_URL != '' }}"
         echo "NODE_ENV is: ${{ env.NODE_ENV }}"
-        # Show DATABASE_URL format (with sensitive parts masked)
-        echo "DATABASE_URL format: ${{ secrets.DATABASE_URL != '' && format('postgres://{0}@{1}/{2}', secrets.DATABASE_URL =~ /postgres:\/\/([^:]+):[^@]+@([^\/]+)\/(.+)/, '$1', '$2', '$3') || 'not set' }}"
+        # Show if DATABASE_URL starts with postgres://
+        echo "DATABASE_URL starts with postgres://: ${{ startsWith(secrets.DATABASE_URL, 'postgres://') }}"
         npx sequelize-cli db:migrate
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
