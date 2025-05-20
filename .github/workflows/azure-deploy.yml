@@ -9,13 +9,11 @@ env:
   AZURE_WEBAPP_NAME: cpu-benchmark-app-hqgqhhf8dvf7hvft
   AZURE_WEBAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '18.x'
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-  JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: BACKEND_ENVIRONMENT
+    environment: BACKEND_ENVIRONMENT  # This allows GitHub to scope secrets from that environment
     
     steps:
     - uses: actions/checkout@v3
@@ -29,15 +27,6 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run database migrations
-      run: |
-        echo "Running database migrations..."
-        echo "DATABASE_URL is set: ${{ secrets.DATABASE_URL != '' }}"
-        npx sequelize-cli db:migrate
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -45,8 +34,24 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Get Web App Configuration
+      id: get-config
+      uses: azure/CLI@v1
+      with:
+        inlineScript: |
+          config=$(az webapp config appsettings list --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group cpu-benchmark-rg --query "[].{name:name,value:value}" -o json)
+          echo "config=$config" >> $GITHUB_OUTPUT
+
+    - name: Run database migrations
+      run: |
+        echo "Running database migrations..."
+        npx sequelize-cli db:migrate
+      env:
+        DATABASE_URL: ${{ fromJSON(steps.get-config.outputs.config)[0].value }}
+        JWT_SECRET: ${{ fromJSON(steps.get-config.outputs.config)[1].value }}
+
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }} 
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
