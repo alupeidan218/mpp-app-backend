@@ -1,6 +1,8 @@
 require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
-module.exports = {
+const env = process.env.NODE_ENV || 'development';
+const config = {
   development: {
     url: process.env.DATABASE_URL,
     dialect: 'postgres',
@@ -37,4 +39,12 @@ module.exports = {
       idle: 10000
     }
   }
-}; 
+};
+
+const sequelize = new Sequelize(config[env].url, {
+  dialect: config[env].dialect,
+  dialectOptions: config[env].dialectOptions,
+  pool: config[env].pool
+});
+
+module.exports = sequelize; 
