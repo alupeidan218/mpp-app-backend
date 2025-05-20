@@ -1,5 +1,30 @@
 require('dotenv').config();
 
+const parseDatabaseUrl = (url) => {
+  if (!url) return {};
+  
+  try {
+    const parsed = new URL(url);
+    return {
+      username: parsed.username,
+      password: parsed.password,
+      database: parsed.pathname.substring(1),
+      host: parsed.hostname,
+      port: parsed.port,
+      dialect: 'postgres',
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false
+        }
+      }
+    };
+  } catch (e) {
+    console.error('Error parsing DATABASE_URL:', e);
+    return {};
+  }
+};
+
 module.exports = {
   development: {
     username: process.env.DB_USER || 'postgres',
@@ -18,17 +43,7 @@ module.exports = {
     logging: false
   },
   production: {
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    host: process.env.DB_HOST,
-    dialect: 'postgres',
-    logging: false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    }
+    ...parseDatabaseUrl(process.env.DATABASE_URL),
+    logging: false
   }
 }; 
