@@ -1,23 +1,13 @@
 const express = require('express');
-const cors = require('cors');
 const app = express();
 
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
   console.log('Origin:', req.headers.origin);
+  console.log('Headers:', req.headers);
   next();
 });
-
-// CORS configuration
-app.use(cors({
-  origin: true, // Allow all origins for now
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
 
 // Parse JSON bodies
 app.use(express.json());
