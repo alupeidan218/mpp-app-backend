@@ -15,7 +15,36 @@ const parseDatabaseUrl = (url) => {
   }
   
   try {
-    // Remove any whitespace and ensure it starts with postgres://
+    // Handle Azure connection string format
+    if (url.includes(';')) {
+      const parts = url.split(';').reduce((acc, part) => {
+        const [key, value] = part.split('=');
+        acc[key] = value;
+        return acc;
+      }, {});
+      
+      console.log('Parsed Azure connection string:', {
+        ...parts,
+        Password: '****' // Hide password in logs
+      });
+      
+      return {
+        username: parts.User,
+        password: parts.Password,
+        database: parts.Database,
+        host: parts.Server,
+        port: 5432,
+        dialect: 'postgres',
+        dialectOptions: {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false
+          }
+        }
+      };
+    }
+    
+    // Handle PostgreSQL URL format
     url = url.trim();
     if (!url.startsWith('postgres://')) {
       url = 'postgres://' + url;
