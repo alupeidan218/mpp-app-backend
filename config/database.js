@@ -4,17 +4,27 @@ const { Sequelize } = require('sequelize');
 // Add debugging
 console.log('Environment variables:', {
   NODE_ENV: process.env.NODE_ENV,
-  DATABASE_URL: process.env.DATABASE_URL ? 'Set (hidden for security)' : 'Not set',
-  // Log other relevant env vars without sensitive data
-  DB_HOST: process.env.DB_HOST,
-  DB_NAME: process.env.DB_NAME,
-  DB_USER: process.env.DB_USER ? 'Set (hidden for security)' : 'Not set'
+  DATABASE_URL: process.env.DATABASE_URL ? 'Set (hidden for security)' : 'Not set'
 });
 
 const env = process.env.NODE_ENV || 'development';
-const config = {
-  development: {
-    url: process.env.DATABASE_URL,
+
+// Parse Azure connection string
+const parseAzureConnectionString = (connectionString) => {
+  if (!connectionString) return null;
+  
+  const parts = connectionString.split(';').reduce((acc, part) => {
+    const [key, value] = part.split('=');
+    acc[key] = value;
+    return acc;
+  }, {});
+
+  return {
+    username: parts['User Id'],
+    password: parts.Password,
+    database: parts.Database,
+    host: parts.Server,
+    port: 5432,
     dialect: 'postgres',
     dialectOptions: {
       ssl: {
@@ -22,9 +32,26 @@ const config = {
         rejectUnauthorized: false
       }
     }
-  },
-  test: {
-    url: process.env.DATABASE_URL,
+  };
+};
+
+// Get database configuration
+const getConfig = () => {
+  if (env === 'production') {
+    const config = parseAzureConnectionString(process.env.DATABASE_URL);
+    if (config) {
+      console.log('Using Azure connection string configuration');
+      return config;
+    }
+  }
+
+  // Fallback to development config
+  return {
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_NAME || 'cpu_benchmark',
+    host: process.env.DB_HOST || 'localhost',
+    port: 5432,
     dialect: 'postgres',
     dialectOptions: {
       ssl: {
@@ -32,16 +59,25 @@ const config = {
         rejectUnauthorized: false
       }
     }
-  },
-  production: {
-    url: process.env.DATABASE_URL,
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    },
+  };
+};
+
+const config = getConfig();
+console.log('Database configuration:', {
+  ...config,
+  password: '****', // Hide password in logs
+  username: '****'  // Hide username in logs
+});
+
+const sequelize = new Sequelize(
+  config.database,
+  config.username,
+  config.password,
+  {
+    host: config.host,
+    port: config.port,
+    dialect: config.dialect,
+    dialectOptions: config.dialectOptions,
     pool: {
       max: 5,
       min: 0,
@@ -49,19 +85,6 @@ const config = {
       idle: 10000
     }
   }
-};
-
-// Add more debugging
-console.log('Selected environment:', env);
-console.log('Database config:', {
-  ...config[env],
-  url: config[env].url ? 'Set (hidden for security)' : 'Not set'
-});
-
-const sequelize = new Sequelize(config[env].url, {
-  dialect: config[env].dialect,
-  dialectOptions: config[env].dialectOptions,
-  pool: config[env].pool
-});
+);
 
 module.exports = sequelize; 

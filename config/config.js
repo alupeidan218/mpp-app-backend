@@ -28,11 +28,8 @@ const parseDatabaseUrl = (url) => {
         Password: '****' // Hide password in logs
       });
       
-      // Extract username without the @server part
-      const username = parts.User.split('@')[0];
-      
       return {
-        username: username,
+        username: parts['User Id'],
         password: parts.Password,
         database: parts.Database,
         host: parts.Server,
@@ -56,7 +53,7 @@ const parseDatabaseUrl = (url) => {
     console.log('Attempting to parse DATABASE_URL:', url.replace(/:[^:@]*@/, ':****@')); // Hide password in logs
     
     const parsed = new URL(url);
-    const config = {
+    return {
       username: parsed.username,
       password: parsed.password,
       database: parsed.pathname.substring(1),
@@ -70,13 +67,6 @@ const parseDatabaseUrl = (url) => {
         }
       }
     };
-    
-    console.log('Parsed database config:', {
-      ...config,
-      password: '****' // Hide password in logs
-    });
-    
-    return config;
   } catch (e) {
     console.error('Error parsing DATABASE_URL:', e);
     console.error('Raw DATABASE_URL:', url.replace(/:[^:@]*@/, ':****@')); // Hide password in logs
@@ -109,8 +99,5 @@ module.exports = {
     dialect: 'postgres',
     logging: false
   },
-  production: {
-    ...parseDatabaseUrl(process.env.DATABASE_URL),
-    logging: false
-  }
+  production: parseDatabaseUrl(process.env.DATABASE_URL)
 }; 
