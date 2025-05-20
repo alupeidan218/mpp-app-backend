@@ -1,30 +1,6 @@
 const express = require('express');
 const app = express();
 
-// CORS headers middleware
-app.use((req, res, next) => {
-  console.log('Request received:', {
-    method: req.method,
-    url: req.url,
-    origin: req.headers.origin,
-    headers: req.headers
-  });
-
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', 'https://cpu-benchmark-app-t5hp.onrender.com');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS request');
-    return res.status(204).end();
-  }
-
-  next();
-});
-
 // Parse JSON bodies
 app.use(express.json());
 

@@ -11,28 +11,69 @@ const env = process.env.NODE_ENV || 'development';
 
 // Parse Azure connection string
 const parseAzureConnectionString = (connectionString) => {
-  if (!connectionString) return null;
+  if (!connectionString) {
+    console.error('DATABASE_URL is not set');
+    return null;
+  }
   
-  const parts = connectionString.split(';').reduce((acc, part) => {
-    const [key, value] = part.split('=');
-    acc[key] = value;
-    return acc;
-  }, {});
-
-  return {
-    username: parts['User Id'],
-    password: parts.Password,
-    database: parts.Database,
-    host: parts.Server,
-    port: 5432,
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
+  try {
+    console.log('Parsing Azure connection string...');
+    const parts = connectionString.split(';').reduce((acc, part) => {
+      const [key, value] = part.split('=');
+      if (!key || !value) {
+        console.error(`Invalid connection string part: ${part}`);
+        return acc;
       }
+      acc[key.trim()] = value.trim();
+      return acc;
+    }, {});
+
+    // Validate required parts
+    const requiredParts = ['Server', 'Database', 'User Id', 'Password'];
+    const missingParts = requiredParts.filter(part => !parts[part]);
+    
+    if (missingParts.length > 0) {
+      console.error('Missing required parts in connection string:', missingParts);
+      return null;
     }
-  };
+
+    console.log('Connection string parsed successfully:', {
+      Server: parts.Server,
+      Database: parts.Database,
+      'User Id': parts['User Id'],
+      Password: '****' // Hide password in logs
+    });
+
+    return {
+      username: parts['User Id'],
+      password: parts.Password,
+      database: parts.Database,
+      host: parts.Server,
+      port: 5432,
+      dialect: 'postgres',
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false
+        }
+      },
+      retry: {
+        max: 5,
+        match: [
+          /SequelizeConnectionError/,
+          /SequelizeConnectionRefusedError/,
+          /SequelizeHostNotFoundError/,
+          /SequelizeHostNotReachableError/,
+          /SequelizeInvalidConnectionError/,
+          /SequelizeConnectionTimedOutError/,
+          /TimeoutError/
+        ]
+      }
+    };
+  } catch (error) {
+    console.error('Error parsing Azure connection string:', error);
+    return null;
+  }
 };
 
 // Get database configuration
@@ -43,6 +84,7 @@ const getConfig = () => {
       console.log('Using Azure connection string configuration');
       return config;
     }
+    console.error('Failed to parse Azure connection string, falling back to development config');
   }
 
   // Fallback to development config
@@ -58,6 +100,18 @@ const getConfig = () => {
         require: true,
         rejectUnauthorized: false
       }
+    },
+    retry: {
+      max: 5,
+      match: [
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+        /TimeoutError/
+      ]
     }
   };
 };
@@ -83,8 +137,26 @@ const sequelize = new Sequelize(
       min: 0,
       acquire: 30000,
       idle: 10000
-    }
+    },
+    retry: config.retry,
+    logging: (msg) => console.log(`[Database] ${msg}`)
   }
 );
+
+// Test the connection
+sequelize.authenticate()
+  .then(() => {
+    console.log('Database connection has been established successfully.');
+  })
+  .catch(err => {
+    console.error('Unable to connect to the database:', err);
+    console.error('Connection details:', {
+      host: config.host,
+      port: config.port,
+      database: config.database,
+      username: config.username,
+      dialect: config.dialect
+    });
+  });
 
 module.exports = sequelize; 

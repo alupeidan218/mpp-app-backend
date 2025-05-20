@@ -18,19 +18,6 @@ const manufacturersRoutes = require('./routes/manufacturers');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize database
-initializeDatabase()
-  .then(() => {
-    console.log('Database initialized successfully');
-    // Initialize monitoring service
-    monitoringService.startMonitoring();
-    console.log('Monitoring service initialized');
-  })
-  .catch(error => {
-    console.error('Failed to initialize database:', error);
-    process.exit(1);
-  });
-
 // Initialize with empty data array
 let cpus = [];
 
@@ -68,7 +55,45 @@ const upload = multer({
   limits: {
     fileSize: 1024 * 1024 * 1024 // 1GB limit
   }
-})
+});
+
+// Function to initialize server with retry logic
+const initializeServer = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`Attempting to initialize database (attempt ${i + 1}/${retries})...`);
+      await initializeDatabase();
+      console.log('Database initialized successfully');
+      
+      // Initialize monitoring service
+      monitoringService.startMonitoring();
+      console.log('Monitoring service initialized');
+      
+      // Start the server
+      server.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+      });
+      
+      return; // Success, exit the function
+    } catch (error) {
+      console.error(`Database initialization failed (attempt ${i + 1}/${retries}):`, error);
+      
+      if (i < retries - 1) {
+        console.log(`Retrying in ${delay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('Max retries reached. Server will start without database connection.');
+        // Start the server anyway, but in a degraded state
+        server.listen(port, () => {
+          console.log(`Server is running on port ${port} (degraded mode - no database connection)`);
+        });
+      }
+    }
+  }
+};
+
+// Start the server with retry logic
+initializeServer();
 
 // Function to generate initial data
 async function generateInitialData(count = 100) {
@@ -199,7 +224,7 @@ wss.on('connection', (ws) => {
 
 // Enable CORS for all routes
 app.use(cors({
-  origin: '*', // Allow all origins during development
+  origin: process.env.FRONTEND_URL || 'https://cpu-benchmark-app-t5hp.onrender.com',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
@@ -614,7 +639,7 @@ process.on('unhandledRejection', (error) => {
 
 // Start the server
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`Server is running on http://0.0.0.0:${port}`);
   console.log('Initializing data...');
   generateInitialData();
   startBackgroundGeneration();
