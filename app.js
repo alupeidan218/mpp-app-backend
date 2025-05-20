@@ -2,20 +2,22 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// CORS configuration
-const corsOptions = {
-  origin: [
-    'https://cpu-benchmark-app-t5hp.onrender.com',
-    'http://localhost:5173',  // For local development
-    'http://localhost:3000'   // For local development
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  console.log('Origin:', req.headers.origin);
+  next();
+});
 
-// Enable CORS with options
-app.use(cors(corsOptions));
+// CORS configuration
+app.use(cors({
+  origin: true, // Allow all origins for now
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
 // Parse JSON bodies
 app.use(express.json());
@@ -24,12 +26,23 @@ app.use(express.json());
 app.use('/api/cpus', require('./routes/cpus'));
 app.use('/api/statistics', require('./routes/statistics'));
 app.use('/api/manufacturers', require('./routes/manufacturers'));
-app.use('/api/auth', require('./routes/auth'));  // Make sure auth routes are included
+app.use('/api/auth', require('./routes/auth'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something broke!' });
+  console.error('Error:', err);
+  console.error('Stack:', err.stack);
+  res.status(500).json({ 
+    error: 'Something broke!',
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  console.log('404 Not Found:', req.method, req.url);
+  res.status(404).json({ error: 'Not Found' });
 });
 
 module.exports = app; 
