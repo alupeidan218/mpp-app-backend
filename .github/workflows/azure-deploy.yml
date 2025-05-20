@@ -9,6 +9,9 @@ env:
   AZURE_WEBAPP_NAME: cpu-benchmark-app-hqgqhhf8dvf7hvft
   AZURE_WEBAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '18.x'
+  VNET_NAME: vnet-bkdhyrsm
+  SUBNET_NAME: subnet-tzgwzqvxc4ug4
+  PRIVATE_DNS_ZONE: privatelink.postgres.database.azure.com
 
 jobs:
   build-and-deploy:
@@ -26,19 +29,40 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run database migrations
-      run: npx sequelize-cli db:migrate
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        NODE_ENV: production
-
     - name: Azure Login
       uses: azure/login@v1
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Configure Private DNS Zone
+      run: |
+        az network private-dns zone show -g cpu-benchmark-rg -n ${{ env.PRIVATE_DNS_ZONE }}
+        az network private-dns record-set a add-record -g cpu-benchmark-rg -z ${{ env.PRIVATE_DNS_ZONE }} -n ${{ secrets.DB_SERVER_NAME }} -a ${{ secrets.DB_PRIVATE_IP }}
+
+    - name: Run database migrations using Azure CLI
+      run: |
+        # Create a temporary file for the migration script
+        echo "const { Sequelize } = require('sequelize');
+        const sequelize = new Sequelize('${{ secrets.DATABASE_URL }}');
+        
+        async function runMigrations() {
+          try {
+            await sequelize.authenticate();
+            console.log('Connection has been established successfully.');
+            await sequelize.sync({ alter: true });
+            console.log('Migrations completed successfully.');
+          } catch (error) {
+            console.error('Unable to connect to the database:', error);
+            process.exit(1);
+          }
+        }
+        
+        runMigrations();" > migrate.js
+        
+        # Run the migration script
+        node migrate.js
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
