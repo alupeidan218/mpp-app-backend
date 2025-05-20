@@ -18,7 +18,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: BACKEND_ENVIRONMENT  # This allows GitHub to scope secrets from that environment
+    environment: BACKEND_ENVIRONMENT
     
     steps:
     - uses: actions/checkout@v3
@@ -36,19 +36,6 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    - name: Run database migrations
-      run: |
-        echo "Running database migrations..."
-        echo "DATABASE_URL is set: ${{ secrets.DATABASE_URL != '' }}"
-        echo "NODE_ENV is: ${{ env.NODE_ENV }}"
-        # Show if DATABASE_URL starts with postgres://
-        echo "DATABASE_URL starts with postgres://: ${{ startsWith(secrets.DATABASE_URL, 'postgres://') }}"
-        npx sequelize-cli db:migrate
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        NODE_ENV: production
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2

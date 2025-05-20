@@ -28,8 +28,11 @@ const parseDatabaseUrl = (url) => {
         Password: '****' // Hide password in logs
       });
       
+      // Extract username without the @server part
+      const username = parts.User.split('@')[0];
+      
       return {
-        username: parts.User,
+        username: username,
         password: parts.Password,
         database: parts.Database,
         host: parts.Server,
