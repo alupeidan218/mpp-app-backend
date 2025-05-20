@@ -41,16 +41,18 @@ jobs:
       uses: azure/CLI@v1
       with:
         inlineScript: |
-          config=$(az webapp config appsettings list --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group cpu-benchmark-rg --query "[].{name:name,value:value}" -o json)
-          echo "config=$config" >> $GITHUB_OUTPUT
+          DATABASE_URL=$(az webapp config appsettings list --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group cpu-benchmark-rg --query "[?name=='DATABASE_URL'].value" -o tsv)
+          JWT_SECRET=$(az webapp config appsettings list --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group cpu-benchmark-rg --query "[?name=='JWT_SECRET'].value" -o tsv)
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_ENV
 
     - name: Run database migrations
       run: |
         echo "Running database migrations..."
         npx sequelize-cli db:migrate
       env:
-        DATABASE_URL: ${{ fromJSON(steps.get-config.outputs.config)[0].value }}
-        JWT_SECRET: ${{ fromJSON(steps.get-config.outputs.config)[1].value }}
+        DATABASE_URL: ${{ env.DATABASE_URL }}
+        JWT_SECRET: ${{ env.JWT_SECRET }}
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
