@@ -9,46 +9,27 @@ console.log('Environment variables:', {
 
 const env = process.env.NODE_ENV || 'development';
 
-// Parse Azure connection string
-const parseAzureConnectionString = (connectionString) => {
-  if (!connectionString) {
+// Parse Render PostgreSQL URL
+const parseRenderPostgresUrl = (url) => {
+  if (!url) {
     console.error('DATABASE_URL is not set');
     return null;
   }
   
   try {
-    console.log('Parsing Azure connection string...');
-    const parts = connectionString.split(';').reduce((acc, part) => {
-      const [key, value] = part.split('=');
-      if (!key || !value) {
-        console.error(`Invalid connection string part: ${part}`);
-        return acc;
-      }
-      acc[key.trim()] = value.trim();
-      return acc;
-    }, {});
-
-    // Validate required parts
-    const requiredParts = ['Server', 'Database', 'User Id', 'Password'];
-    const missingParts = requiredParts.filter(part => !parts[part]);
+    // Remove the postgresql:// prefix if it exists
+    const cleanUrl = url.replace('postgresql://', '');
     
-    if (missingParts.length > 0) {
-      console.error('Missing required parts in connection string:', missingParts);
-      return null;
-    }
-
-    console.log('Connection string parsed successfully:', {
-      Server: parts.Server,
-      Database: parts.Database,
-      'User Id': parts['User Id'],
-      Password: '****' // Hide password in logs
-    });
-
+    // Split the URL into parts
+    const [credentials, rest] = cleanUrl.split('@');
+    const [username, password] = credentials.split(':');
+    const [host, database] = rest.split('/');
+    
     return {
-      username: parts['User Id'],
-      password: parts.Password,
-      database: parts.Database,
-      host: parts.Server,
+      username,
+      password,
+      database,
+      host,
       port: 5432,
       dialect: 'postgres',
       dialectOptions: {
@@ -71,7 +52,7 @@ const parseAzureConnectionString = (connectionString) => {
       }
     };
   } catch (error) {
-    console.error('Error parsing Azure connection string:', error);
+    console.error('Error parsing Render PostgreSQL URL:', error);
     return null;
   }
 };
@@ -79,12 +60,12 @@ const parseAzureConnectionString = (connectionString) => {
 // Get database configuration
 const getConfig = () => {
   if (env === 'production') {
-    const config = parseAzureConnectionString(process.env.DATABASE_URL);
+    const config = parseRenderPostgresUrl(process.env.DATABASE_URL);
     if (config) {
-      console.log('Using Azure connection string configuration');
+      console.log('Using Render PostgreSQL configuration');
       return config;
     }
-    console.error('Failed to parse Azure connection string, falling back to development config');
+    console.error('Failed to parse Render PostgreSQL URL, falling back to development config');
   }
 
   // Fallback to development config
