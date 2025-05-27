@@ -242,7 +242,7 @@ wss.on('connection', (ws) => {
 
 // Enable CORS for all routes
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://cpu-benchmark-app-t5hp.onrender.com',
+  origin: ['https://cpu-benchmark-app-t5hp.onrender.com', 'https://mpp-app-backend.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
