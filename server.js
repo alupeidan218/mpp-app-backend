@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const monitoringRoutes = require('./routes/monitoring');
 const statisticsRoutes = require('./routes/statistics');
 const manufacturersRoutes = require('./routes/manufacturers');
+const twoFactorRoutes = require('./routes/twoFactor');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -259,6 +260,9 @@ app.use('/api/manufacturers', authenticateToken, actionLogger('MANUFACTURER'), m
 app.use('/api/cpus', authenticateToken, actionLogger('CPU'), require('./routes/cpus'));
 app.use('/api/uploads', authenticateToken, actionLogger('FILE'), require('./routes/uploads'));
 app.use('/api/download', authenticateToken, actionLogger('FILE'), require('./routes/download'));
+
+// Add 2FA routes
+app.use('/api/2fa', twoFactorRoutes);
 
 // GET /api/cpus - Get all CPUs with filtering and sorting
 app.get('/api/cpus', [

@@ -1,8 +1,15 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
 
-const User = sequelize.define('User', {
+class User extends Model {
+  static associate(models) {
+    User.hasMany(models.CPU, { foreignKey: 'userId' });
+    User.hasMany(models.UserAction, { foreignKey: 'userId' });
+  }
+}
+
+User.init({
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
@@ -45,8 +52,22 @@ const User = sequelize.define('User', {
   lastLoginAt: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  twoFactorSecret: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  twoFactorEnabled: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  twoFactorVerified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 }, {
+  sequelize,
+  modelName: 'User',
   timestamps: true,
   indexes: [
     {
