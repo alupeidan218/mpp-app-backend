@@ -59,6 +59,8 @@ const upload = multer({
 
 // Function to initialize server with retry logic
 const initializeServer = async (retries = 5, delay = 5000) => {
+  let serverStarted = false;
+
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`Attempting to initialize database (attempt ${i + 1}/${retries})...`);
@@ -69,10 +71,13 @@ const initializeServer = async (retries = 5, delay = 5000) => {
       monitoringService.startMonitoring();
       console.log('Monitoring service initialized');
       
-      // Start the server
-      server.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-      });
+      // Only start the server if it hasn't been started yet
+      if (!serverStarted) {
+        server.listen(port, () => {
+          console.log(`Server is running on port ${port}`);
+        });
+        serverStarted = true;
+      }
       
       return; // Success, exit the function
     } catch (error) {
@@ -83,17 +88,23 @@ const initializeServer = async (retries = 5, delay = 5000) => {
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         console.error('Max retries reached. Server will start without database connection.');
-        // Start the server anyway, but in a degraded state
-        server.listen(port, () => {
-          console.log(`Server is running on port ${port} (degraded mode - no database connection)`);
-        });
+        // Only start the server if it hasn't been started yet
+        if (!serverStarted) {
+          server.listen(port, () => {
+            console.log(`Server is running on port ${port} (degraded mode - no database connection)`);
+          });
+          serverStarted = true;
+        }
       }
     }
   }
 };
 
 // Start the server with retry logic
-initializeServer();
+initializeServer().catch(error => {
+  console.error('Failed to initialize server:', error);
+  process.exit(1);
+});
 
 // Function to generate initial data
 async function generateInitialData(count = 100) {
