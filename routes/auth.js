@@ -91,9 +91,12 @@ router.post('/login', [
   body('password').notEmpty().withMessage('Password is required')
 ], async (req, res) => {
   try {
+    console.log('Login request received:', { username: req.body.username });
+    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -109,18 +112,25 @@ router.post('/login', [
       }
     });
 
+    console.log('User found:', user ? { id: user.id, username: user.username } : 'No user found');
+
     if (!user) {
+      console.log('No user found with username/email:', username);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Check password
     const isValidPassword = await user.validatePassword(password);
+    console.log('Password validation result:', isValidPassword);
+
     if (!isValidPassword) {
+      console.log('Invalid password for user:', username);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
+      console.log('2FA is enabled for user:', username);
       // Generate a temporary token for 2FA verification
       const tempToken = jwt.sign(
         { id: user.id, username: user.username, role: user.role },
@@ -128,6 +138,7 @@ router.post('/login', [
         { expiresIn: '5m' } // Short expiration for security
       );
 
+      console.log('Generated temp token for 2FA');
       return res.json({
         requires2FA: true,
         tempToken,
@@ -135,6 +146,7 @@ router.post('/login', [
       });
     }
 
+    console.log('2FA not enabled, proceeding with normal login');
     // If 2FA is not enabled, proceed with normal login
     // Update last login
     await user.update({ lastLoginAt: new Date() });
@@ -146,7 +158,9 @@ router.post('/login', [
       { expiresIn: '24h' }
     );
 
-    res.json({
+    console.log('Generated JWT token for user:', username);
+
+    const response = {
       message: 'Login successful',
       token,
       user: {
@@ -155,10 +169,18 @@ router.post('/login', [
         email: user.email,
         role: user.role
       }
+    };
+
+    console.log('Sending login response:', { 
+      message: response.message,
+      hasToken: !!response.token,
+      userId: response.user.id
     });
+
+    res.json(response);
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Login failed', details: error.message });
   }
 });
 
