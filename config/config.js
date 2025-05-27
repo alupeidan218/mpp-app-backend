@@ -88,8 +88,14 @@ module.exports = {
     password: process.env.DB_PASSWORD || 'postgres',
     database: process.env.DB_NAME || 'cpu_benchmark',
     host: process.env.DB_HOST || 'localhost',
+    port: 5432,
     dialect: 'postgres',
-    logging: false
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
   },
   test: {
     username: process.env.DB_USER || 'postgres',
@@ -99,5 +105,20 @@ module.exports = {
     dialect: 'postgres',
     logging: false
   },
-  production: parseDatabaseUrl(process.env.DATABASE_URL)
+  production: {
+    use_env_variable: 'DATABASE_URL',
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    },
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  }
 }; 

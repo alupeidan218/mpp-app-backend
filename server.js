@@ -59,8 +59,6 @@ const upload = multer({
 
 // Function to initialize server with retry logic
 const initializeServer = async (retries = 5, delay = 5000) => {
-  let serverStarted = false;
-
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`Attempting to initialize database (attempt ${i + 1}/${retries})...`);
@@ -71,15 +69,7 @@ const initializeServer = async (retries = 5, delay = 5000) => {
       monitoringService.startMonitoring();
       console.log('Monitoring service initialized');
       
-      // Only start the server if it hasn't been started yet
-      if (!serverStarted) {
-        server.listen(port, () => {
-          console.log(`Server is running on port ${port}`);
-        });
-        serverStarted = true;
-      }
-      
-      return; // Success, exit the function
+      return true; // Success, exit the function
     } catch (error) {
       console.error(`Database initialization failed (attempt ${i + 1}/${retries}):`, error);
       
@@ -88,23 +78,39 @@ const initializeServer = async (retries = 5, delay = 5000) => {
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         console.error('Max retries reached. Server will start without database connection.');
-        // Only start the server if it hasn't been started yet
-        if (!serverStarted) {
-          server.listen(port, () => {
-            console.log(`Server is running on port ${port} (degraded mode - no database connection)`);
-          });
-          serverStarted = true;
-        }
+        return false;
       }
     }
   }
+  return false;
 };
 
-// Start the server with retry logic
-initializeServer().catch(error => {
-  console.error('Failed to initialize server:', error);
-  process.exit(1);
-});
+// Start the server
+const startServer = async () => {
+  try {
+    // Try to initialize database
+    const dbInitialized = await initializeServer();
+    
+    if (!dbInitialized) {
+      console.log('Starting server in degraded mode (no database connection)');
+    }
+
+    // Start the server
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`Server is running on http://0.0.0.0:${port}`);
+      console.log('Initializing data...');
+      generateInitialData();
+      startBackgroundGeneration();
+      console.log('Server initialization complete');
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
 
 // Function to generate initial data
 async function generateInitialData(count = 100) {
@@ -646,13 +652,4 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled Rejection:', error);
   process.exit(1);
-});
-
-// Start the server
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${port}`);
-  console.log('Initializing data...');
-  generateInitialData();
-  startBackgroundGeneration();
-  console.log('Server initialization complete');
 }); 
