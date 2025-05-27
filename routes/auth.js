@@ -119,6 +119,23 @@ router.post('/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      // Generate a temporary token for 2FA verification
+      const tempToken = jwt.sign(
+        { id: user.id, username: user.username, role: user.role },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '5m' } // Short expiration for security
+      );
+
+      return res.json({
+        requires2FA: true,
+        tempToken,
+        message: '2FA verification required'
+      });
+    }
+
+    // If 2FA is not enabled, proceed with normal login
     // Update last login
     await user.update({ lastLoginAt: new Date() });
 
@@ -142,6 +159,54 @@ router.post('/login', [
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Add complete-login endpoint for 2FA verification
+router.post('/complete-login', [
+  body('tempToken').notEmpty().withMessage('Temporary token is required'),
+  body('token').isLength({ min: 6, max: 6 }).isNumeric().withMessage('2FA token must be 6 digits')
+], async (req, res) => {
+  try {
+    const { tempToken, token } = req.body;
+
+    // Verify the temporary token
+    const decoded = jwt.verify(tempToken, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findByPk(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify 2FA token
+    const isValidToken = await user.verify2FAToken(token);
+    if (!isValidToken) {
+      return res.status(401).json({ error: 'Invalid 2FA token' });
+    }
+
+    // Update last login
+    await user.update({ lastLoginAt: new Date() });
+
+    // Generate final JWT token
+    const finalToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      message: 'Login successful',
+      token: finalToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('2FA verification error:', error);
+    res.status(401).json({ error: 'Invalid or expired temporary token' });
   }
 });
 
