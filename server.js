@@ -261,8 +261,8 @@ app.use('/api/cpus', authenticateToken, actionLogger('CPU'), require('./routes/c
 app.use('/api/uploads', authenticateToken, actionLogger('FILE'), require('./routes/uploads'));
 app.use('/api/download', authenticateToken, actionLogger('FILE'), require('./routes/download'));
 
-// Add 2FA routes
-app.use('/api/2fa', twoFactorRoutes);
+// Add 2FA routes with authentication
+app.use('/api/2fa', authenticateToken, twoFactorRoutes);
 
 // GET /api/cpus - Get all CPUs with filtering and sorting
 app.get('/api/cpus', [
