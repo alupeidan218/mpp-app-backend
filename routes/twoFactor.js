@@ -82,4 +82,22 @@ router.post('/verify', [
   }
 });
 
+// Get 2FA status
+router.get('/status', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      enabled: user.twoFactorEnabled,
+      verified: user.twoFactorVerified
+    });
+  } catch (error) {
+    console.error('Error getting 2FA status:', error);
+    res.status(500).json({ error: 'Failed to get 2FA status' });
+  }
+});
+
 module.exports = router; 
