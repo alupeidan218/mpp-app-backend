@@ -30,6 +30,27 @@ const upload = multer({
   }
 });
 
+// GET /api/uploads - List uploaded files
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    let files;
+    if (req.user.role === 'admin') {
+      files = await UploadedFile.findAll({
+        order: [['date', 'DESC']]
+      });
+    } else {
+      files = await UploadedFile.findAll({ 
+        where: { userId: req.user.id },
+        order: [['date', 'DESC']]
+      });
+    }
+    res.json(files);
+  } catch (error) {
+    console.error('Error fetching uploaded files:', error);
+    res.status(500).json({ error: 'Error fetching uploaded files' });
+  }
+});
+
 // POST /api/uploads - Upload a file
 router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
   try {
@@ -74,10 +95,13 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     });
 
     // Add valid entries to the database
-    const createdCPUs = await CPU.bulkCreate(validEntries);
+    const createdCPUs = await CPU.bulkCreate(validEntries.map(entry => ({
+      ...entry,
+      userId: req.user.id
+    })));
 
     // Save file metadata to UploadedFile table
-    await UploadedFile.create({
+    const uploadedFile = await UploadedFile.create({
       name: file.filename,
       originalname: file.originalname,
       size: file.size,
@@ -88,12 +112,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
     // Return success response with stats
     res.json({
       message: 'File uploaded successfully',
-      file: {
-        filename: file.filename,
-        originalname: file.originalname,
-        size: file.size,
-        mimetype: file.mimetype
-      },
+      file: uploadedFile,
       stats: {
         totalEntries: entries.length,
         validEntries: validEntries.length,
@@ -108,38 +127,26 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
   }
 });
 
-// GET /api/uploads - List uploaded files
-router.get('/', authenticateToken, async (req, res) => {
-  try {
-    let files;
-    if (req.user.role === 'admin') {
-      files = await UploadedFile.findAll();
-    } else {
-      files = await UploadedFile.findAll({ where: { userId: req.user.id } });
-    }
-    res.json(files);
-  } catch (error) {
-    console.error('Error fetching uploaded files:', error);
-    res.status(500).json({ error: 'Error fetching uploaded files' });
-  }
-});
-
 // DELETE /api/uploads/:name - Delete a file
 router.delete('/:name', authenticateToken, async (req, res) => {
   try {
     const filename = req.params.name;
     const fileRecord = await UploadedFile.findOne({ where: { name: filename } });
+    
     if (!fileRecord) {
       return res.status(404).json({ error: 'File not found' });
     }
+    
     if (req.user.role !== 'admin' && fileRecord.userId !== req.user.id) {
       return res.status(403).json({ error: 'You do not have permission to delete this file' });
     }
+
     // Remove file from disk
     const filePath = path.join(__dirname, '../uploads', filename);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
+
     // Remove DB record
     await fileRecord.destroy();
     res.status(204).send();

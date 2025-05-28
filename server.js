@@ -6,7 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { Op } = require('sequelize');
-const { CPU, Manufacturer, UserAction, initializeDatabase } = require('./models');
+const { CPU, Manufacturer, UserAction, initializeDatabase, sequelize } = require('./models');
 const { authenticateToken, authorizeRole } = require('./middleware/auth');
 const actionLogger = require('./middleware/actionLogger');
 const monitoringService = require('./services/MonitoringService');
@@ -15,9 +15,11 @@ const monitoringRoutes = require('./routes/monitoring');
 const statisticsRoutes = require('./routes/statistics');
 const manufacturersRoutes = require('./routes/manufacturers');
 const twoFactorRoutes = require('./routes/twoFactor');
+const cpuRoutes = require('./routes/cpus');
+const uploadRoutes = require('./routes/uploads');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Initialize with empty data array
 let cpus = [];
@@ -97,8 +99,8 @@ const startServer = async () => {
     }
 
     // Start the server
-    server.listen(port, '0.0.0.0', () => {
-      console.log(`Server is running on http://0.0.0.0:${port}`);
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server is running on http://0.0.0.0:${PORT}`);
       console.log('Initializing data...');
       generateInitialData();
       startBackgroundGeneration();
@@ -249,6 +251,10 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Public routes
 app.use('/api/auth', authRoutes);
@@ -257,8 +263,8 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/manufacturers', authenticateToken, actionLogger('MANUFACTURER'), manufacturersRoutes);
 
 // Protected routes
-app.use('/api/cpus', authenticateToken, actionLogger('CPU'), require('./routes/cpus'));
-app.use('/api/uploads', authenticateToken, actionLogger('FILE'), require('./routes/uploads'));
+app.use('/api/cpus', authenticateToken, actionLogger('CPU'), cpuRoutes);
+app.use('/api/uploads', authenticateToken, actionLogger('FILE'), uploadRoutes);
 app.use('/api/download', authenticateToken, actionLogger('FILE'), require('./routes/download'));
 
 // Add 2FA routes with authentication
@@ -636,10 +642,10 @@ function startBackgroundGeneration() {
 // Start the server with error handling
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use. Please try the following:`);
+    console.error(`Port ${PORT} is already in use. Please try the following:`);
     console.error('1. Wait a few seconds and try again');
     console.error('2. Check if another instance is running');
-    console.error('3. Try using a different port');
+    console.error('3. Try a different port by setting the PORT environment variable');
     process.exit(1);
   } else {
     console.error('Server error:', error);
@@ -656,4 +662,19 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled Rejection:', error);
   process.exit(1);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// Start server
+sequelize.sync().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Unable to connect to the database:', err);
 }); 
