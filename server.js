@@ -112,8 +112,13 @@ const startServer = async () => {
   }
 };
 
-// Start the server
-startServer();
+// Start server
+sequelize.sync().then(() => {
+  startServer();
+}).catch(err => {
+  console.error('Unable to connect to the database:', err);
+  process.exit(1);
+});
 
 // Function to generate initial data
 async function generateInitialData(count = 100) {
@@ -668,13 +673,4 @@ process.on('unhandledRejection', (error) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// Start server
-sequelize.sync().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('Unable to connect to the database:', err);
 }); 
