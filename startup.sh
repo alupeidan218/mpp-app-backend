@@ -3,4 +3,4 @@
 # Install dependencies
 echo "Installing dependencies..."
 npm install
-node backend/seed.js
+node seed.js
