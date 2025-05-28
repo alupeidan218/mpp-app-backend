@@ -3,4 +3,3 @@
 # Install dependencies
 echo "Installing dependencies..."
 npm install
-node seed.js
